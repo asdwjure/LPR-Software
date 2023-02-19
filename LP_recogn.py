@@ -3,6 +3,8 @@ import imutils
 import numpy as np
 import pytesseract
 
+pytesseract.pytesseract.tesseract_cmd = 'C:\Program Files\Tesseract-OCR\\tesseract.exe' # Tesseract path on windows (NOTE: For Linux this must be deleted)
+
 
 def clean2_plate(plate):
     gray_img = cv2.cvtColor(plate, cv2.COLOR_BGR2GRAY)
@@ -88,7 +90,7 @@ def straighten_plate(img, rect):
 
 if __name__ == "__main__":
 
-    img = cv2.imread('slo2.jpg', cv2.IMREAD_COLOR)
+    img = cv2.imread('images/slo3.jpg', cv2.IMREAD_COLOR)
     img = cv2.resize(img, (600,400) )
 
     cv2.imshow('Original slika', img)
