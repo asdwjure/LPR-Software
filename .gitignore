@@ -1,2 +1,4 @@
 images/
 datasets/
+tensorflow/workspace/annotations/
+tensorflow/workspace/pre-trained-models/
