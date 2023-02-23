@@ -1,0 +1,7 @@
+# Ignore everything
+*
+
+# Except
+!.gitignore
+!annotations/label_map.pbtxt
+!models/*/pipeline.config
