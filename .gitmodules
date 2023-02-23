@@ -1,6 +1,6 @@
 [submodule "tensorflow/models"]
 	path = tensorflow/models
 	url = https://github.com/tensorflow/models.git
-[submodule "tensorflow/labelImg"]
-	path = tensorflow/labelImg
+[submodule "labelImg"]
+	path = labelImg
 	url = https://github.com/heartexlabs/labelImg.git
