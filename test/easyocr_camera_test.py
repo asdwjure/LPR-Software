@@ -7,17 +7,13 @@ import pytesseract
 import tensorflow as tf
 import cv2
 import numpy as np
-import tkinter
-import matplotlib
-import matplotlib.pyplot as plt
-matplotlib.use('TkAgg')
 from object_detection.utils import visualization_utils as viz_utils
 from object_detection.builders import model_builder
 from object_detection.utils import config_util
 import easyocr
 
 IMG_PATH = 'dataset/images/train/'
-IMG_SIZE = (1365, 1024)
+IMG_SIZE = (1080, 720)
 
 LABELS = {
     1: {
@@ -28,7 +24,7 @@ LABELS = {
 
 PLATE_DETECTION_THRESHOLD = 0.8
 TEXT_DETECTION_THRESHOLD = 0.5
-MIN_AREA_PLATE = 0.0 # Minimum area that a plate needs to cover in a whole image in order to start doing OCR on it.
+MIN_AREA_PLATE = 0.05
 PLATE_CHARS = 'ABCDEFGHIJKLMNOPRSTUVZYXQ1234567890-' # All possible chars in a plate
 PLATE_CITIES = ['KP', 'LJ', 'KR', 'GO', 'PO', 'NM', 'MB', 'SG', 'KK', 'MS', 'CE']
 
@@ -82,15 +78,6 @@ def expandRoi(roi, num_pixels, img_width, img_height):
 
 if __name__ == '__main__':
 
-    # Limit Tensorflow GPU consumption
-    # gpus = tf.config.list_physical_devices('GPU')
-    # if gpus:
-    #     try: 
-    #         tf.config.experimental.set_virtual_device_configuration(
-    #             gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=3381)])
-    #     except:
-    #         print(sys.exc_info()[0])
-
     # Load pipeline config and build a detection model
     configs = config_util.get_configs_from_pipeline_file('tensorflow/workspace/models/plate_model_320/pipeline.config')
     detection_model = model_builder.build(model_config=configs['model'], is_training=False)
@@ -102,21 +89,13 @@ if __name__ == '__main__':
     # Configure EasyOCR reader
     reader = easyocr.Reader(['en'], gpu=True)
 
-    # Enable interactive mode for pyplot (so we dont block the program)
-    # plt.ion()
-    plt.switch_backend('TkAgg')
-
-    # Get all .jpg images in test folder
-    # jpg_images = [filename for filename in os.listdir(IMG_PATH) if filename.endswith('.jpg')]
-    # random.shuffle(jpg_images)
-    jpg_images = ['dataset/collected_images/IMG20230302123151.jpg']
-
-    plates = []
-
-    for image in jpg_images: # Loop through all images in test folder
+    # cap = cv2.VideoCapture('dataset/collected_images/VID20230305180320.mp4')
+    cap = cv2.VideoCapture(0)
+    # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 100)
+    # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 80)
+    while cap.isOpened():
         # Load the image using OpenCV
-        # img = cv2.imread('{}{}'.format(IMG_PATH, image))
-        img = cv2.imread(image)
+        _, img = cap.read()
         img = cv2.resize(img, IMG_SIZE)
         img_np = np.array(img) # Convert image to numpy array for faster processing
         # cv2.imshow('Loaded img', img_np)
@@ -146,7 +125,7 @@ if __name__ == '__main__':
                     min_score_thresh=PLATE_DETECTION_THRESHOLD,
                     agnostic_mode=False)
         
-        cv2.imshow('Object detection',  image_np_with_detections)
+        # cv2.imshow('Object detection',  image_np_with_detections)
 
         if detections['detection_scores'][0] > PLATE_DETECTION_THRESHOLD: # Boxes are sorted from most probable to least probable. So just take the 0th index and we got our most probable detection
             roi = detections['detection_boxes'][0]
@@ -163,36 +142,46 @@ if __name__ == '__main__':
 
                 img_roi = cv2.resize(img_np[roi[0]:roi[2], roi[1]:roi[3]], (780,195)) # Crop image to ROI and resize
                 img_roi = cv2.cvtColor(img_roi, cv2.COLOR_BGR2GRAY)
-                img_roi = cv2.GaussianBlur(img_roi, (5,5), 0)
-                img_roi = cv2.equalizeHist(img_roi)
-                mean_value = np.mean(img_roi)
-                _, img_roi = cv2.threshold(img_roi, mean_value-40, 255, cv2.THRESH_BINARY_INV)
-                # img_roi = cv2.adaptiveThreshold(img_roi, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 21, 10)
-                # kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+                img_roi = cv2.GaussianBlur(img_roi, (9,9), 0)
+                cv2.imshow('Gray plate', img_roi)
+                # img_roi = cv2.bitwise_not(img_roi) # Invert image
+                # cv2.imshow('Inverted plate', img_roi)
+                # img_roi = cv2.equalizeHist(img_roi)
+                # cv2.imshow('Eq plate', img_roi)
+                mean_value = np.mean(img_roi[80:120, 200:580])
+                min_value = np.min(img_roi[80:120, 200:580])
+                max_value = np.max(img_roi[80:120, 200:580])
+                cv2.imshow('Mean value calculation', img_roi[80:120, 200:580])
+                print('Mean, min, max:', mean_value, min_value, max_value)
+                thresh = mean_value - (1.0*(255-min_value)/255 + 1)*35
+                print('Thresholold:', thresh)
+                _, img_roi = cv2.threshold(img_roi, thresh, 255, cv2.THRESH_BINARY_INV)
+                # img_roi = cv2.adaptiveThreshold(img_roi, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 41, 35)
+                cv2.imshow('Thresholding', img_roi)
+                kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
                 # img_roi = cv2.erode(img_roi, kernel=kernel)
+                # img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_CLOSE, kernel=kernel) # 2 times because no. of iterations is not equal to two calls to this function.
+                # img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_CLOSE, kernel=kernel)
 
                 ocr_result = reader.readtext(img_roi, allowlist=PLATE_CHARS, min_size=60, height_ths=0.1, width_ths=0.1) # Perform OCR
+                # ocr_result = pytesseract.image_to_string(img_roi, config='--psm 11')
                 # ocr_result = pytesseract.image_to_data(img_roi, config='--psm 11', nice=0)
                 detected_plate = ocrTextFilter(ocr_result, threshold=TEXT_DETECTION_THRESHOLD)
                 
                 print(ocr_result)
                 print(detected_plate)
-                plates.append(detected_plate)
-                
+
                 for box in ocr_result:
-                    start_point = box[0][0]
-                    end_point = box[0][2]
-                    cv2.rectangle(img_roi, start_point.astype(np.int64), end_point.astype(np.int64), (255,255,255), 2)
+                    start_point = (int(box[0][0][0]), int(box[0][0][1]))
+                    end_point = (int(box[0][2][0]), int(box[0][2][1]))
+                    cv2.rectangle(img_roi, start_point, end_point, (255,255,255), 2)
 
                 cv2.imshow('Region of interest', img_roi)
 
-                cv2.waitKey(0)
+        cv2.imshow('Object detection',  image_np_with_detections)
 
-        cv2.destroyAllWindows()
-
-    count = len([x for x in plates if x is not None])
-    print(plates)
-    print('Pravilno prepoznal {}% tablic.'.format(count/len(plates)))
-
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            cap.release()
+            cv2.destroyAllWindows()
 
 
