@@ -18,16 +18,7 @@ LABELS = ['plate']
 
 def load_labels(path='labels.txt'):
   """Loads the labels file. Supports files with or without index numbers."""
-  with open(path, 'r', encoding='utf-8') as f:
-    lines = f.readlines()
-    labels = {}
-    for row_number, content in enumerate(lines):
-      pair = re.split(r'[:\s]+', content.strip(), maxsplit=1)
-      if len(pair) == 2 and pair[0].strip().isdigit():
-        labels[int(pair[0])] = pair[1].strip()
-      else:
-        labels[row_number] = pair[0].strip()
-  return labels
+  return LABELS
 
 def set_input_tensor(interpreter, image):
   """Sets the input tensor."""
@@ -51,10 +42,10 @@ def detect_objects(interpreter, image, threshold):
   boxes = get_output_tensor(interpreter, 0)
   classes = get_output_tensor(interpreter, 1)
   scores = get_output_tensor(interpreter, 2)
-  count = int(get_output_tensor(interpreter, 3))
+  # count = int(get_output_tensor(interpreter, 3))
 
   results = []
-  for i in range(count):
+  for i in len(range(scores)):
     if scores[i] >= threshold:
       result = {
           'bounding_box': boxes[i],
@@ -66,7 +57,7 @@ def detect_objects(interpreter, image, threshold):
 
 def main():
     labels = load_labels()
-    interpreter = Interpreter('detect.tflite')
+    interpreter = Interpreter('/home/jrebernik/Magistrska/LPR-Software/RPi/detect.tflite')
     interpreter.allocate_tensors()
     _, input_height, input_width, _ = interpreter.get_input_details()[0]['shape']
 
