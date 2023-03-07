@@ -5,11 +5,32 @@ import cv2
 import numpy as np
 # from tensorflow.lite.python.interpreter import Interpreter
 from tflite_runtime.interpreter import Interpreter
+import easyocr
+import pytesseract
 
 PATH_TO_MODEL='/home/jrebernik/Magistrska/LPR-Software/RPi/detect.tflite'
 PATH_TO_LABELS='labels.txt'
 LABELS = ['plate']
 MIN_CONF_THRESHOLD=0.8
+
+TEXT_DETECTION_THRESHOLD = 0.5
+MIN_AREA_PLATE = 0.05
+PLATE_CHARS = 'ABCDEFGHIJKLMNOPRSTUVZYXQ1234567890-' # All possible chars in a plate
+PLATE_CITIES = ['KP', 'LJ', 'KR', 'GO', 'PO', 'NM', 'MB', 'SG', 'KK', 'MS', 'CE']
+
+def filterTessOutput(ocr_output):
+    ocr = []
+    for c in ocr_output:
+        if c in PLATE_CHARS:
+            ocr.append(c)
+
+    if len(ocr) != 8: return None # Plates are of type KPCR-292
+
+    city = ''.join(ocr[0:2]) # first two chars are city
+    if city not in PLATE_CITIES:
+        return None
+
+    return ''.join(ocr)
 
 if __name__ == '__main__':
 
@@ -31,8 +52,10 @@ if __name__ == '__main__':
     # Initialize frame rate calculation
     frame_rate_calc = 1
     freq = cv2.getTickFrequency()
+    plate_counter = 0
 
     # Loop over every image and perform detection
+    # cap = cv2.VideoCapture('/home/jrebernik/Magistrska/LPR-Software/dataset/collected_images/VID20230303173709.mp4')
     cap = cv2.VideoCapture(0)
 
     while cap.isOpened():
@@ -54,28 +77,54 @@ if __name__ == '__main__':
         interpreter.set_tensor(input_details[0]['index'], input_data)
         interpreter.invoke()
 
-        # Retrieve detection results
-        boxes = interpreter.get_tensor(output_details[1]['index'])[0] # Bounding box coordinates of detected objects
-        classes = interpreter.get_tensor(output_details[3]['index'])[0] # Class index of detected objects
-        scores = interpreter.get_tensor(output_details[0]['index'])[0] # Confidence of detected objects
-        #num = interpreter.get_tensor(output_details[3]['index'])  # Total number of detected objects (inaccurate and not needed)
+        # Retrieve detection results (detections are sorted, this is why we only take the first one)
+        box = interpreter.get_tensor(output_details[1]['index'])[0][0] # Bounding box coordinates of detected objects
+        score = interpreter.get_tensor(output_details[0]['index'])[0][0] # Confidence of detected objects
 
-        # Loop over all detections and draw detection box if confidence is above minimum threshold
-        for i in range(len(scores)):
-            if ((scores[i] > MIN_CONF_THRESHOLD) and (scores[i] <= 1.0)):
+        # If detection box confidence is above minimum threshold
+        if score > MIN_CONF_THRESHOLD: # Scores are already sorted
 
-                # Get bounding box coordinates and draw box
-                # Interpreter can return coordinates that are outside of image dimensions, need to force them to be within image using max() and min()
-                ymin = int(max(1,(boxes[i][0] * imH)))
-                xmin = int(max(1,(boxes[i][1] * imW)))
-                ymax = int(min(imH,(boxes[i][2] * imH)))
-                xmax = int(min(imW,(boxes[i][3] * imW)))
-                
-                cv2.rectangle(image, (xmin,ymin), (xmax,ymax), (10, 255, 0), 2)
+            # Get bounding box coordinates and draw box
+            # Interpreter can return coordinates that are outside of image dimensions, need to force them to be within image using max() and min()
+            ymin = int(max(1,(box[0] * imH)))
+            xmin = int(max(1,(box[1] * imW)))
+            ymax = int(min(imH,(box[2] * imH)))
+            xmax = int(min(imW,(box[3] * imW)))
+            roi_area = (box[2]-box[0])*(box[3]-box[1])
+
+            if roi_area > MIN_AREA_PLATE:
+                # print(roi_area)
+
+                img_roi = cv2.resize(image[ymin:ymax, xmin:xmax], (780,195)) # Crop image to ROI and resize
+                img_roi = cv2.cvtColor(img_roi, cv2.COLOR_BGR2GRAY)
+                cv2.imshow('Gray plate', img_roi)
+                img_roi = cv2.equalizeHist(img_roi)
+                img_roi = cv2.GaussianBlur(img_roi, (7,7), 0)
+                cv2.imshow('Eq plate', img_roi)
+
+                histogram = cv2.calcHist([img_roi], [0], None, [256], [0,256], accumulate=False)
+                hist_max = np.argmax(histogram[50:100], 0)[0] + 50 # Najdi peak med pixli ki imajo vrednost med 50 in 100
+
+
+                for thr_const in [5, 15, 25]:
+                    _, img_roi = cv2.threshold(img_roi, hist_max-thr_const, 255, cv2.THRESH_BINARY)
+                    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+                    img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_ERODE, kernel=kernel)
+                    cv2.imshow('Region of interest', img_roi)
+
+                    ocr_result = pytesseract.image_to_string(img_roi)
+                    ocr_result = filterTessOutput(ocr_result)
+                    
+                    if ocr_result != None:
+                        print('Threshold:', hist_max-thr_const)
+                        print(plate_counter, ocr_result)
+                        plate_counter += 1
+
+                cv2.rectangle(image, (xmin,ymin), (xmax,ymax), (0,255,0), 2)
 
                 # Draw label
                 object_name = 'plate' # Look up object name from "labels" array using class index
-                label = '%s: %d%%' % (object_name, int(scores[i]*100)) # Example: 'person: 72%'
+                label = '%s: %d%%' % (object_name, int(score*100)) # Example: 'person: 72%'
                 labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
                 label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
                 cv2.rectangle(image, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), (255, 255, 255), cv2.FILLED) # Draw white box to put label text in
