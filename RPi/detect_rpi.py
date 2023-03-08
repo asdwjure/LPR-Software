@@ -7,6 +7,7 @@ import numpy as np
 from tflite_runtime.interpreter import Interpreter
 import time
 import pytesseract
+from matplotlib import pyplot as plt
 
 PATH_TO_MODEL='/home/jrebernik/Magistrska/LPR-Software/RPi/detect.tflite'
 PATH_TO_LABELS='labels.txt'
@@ -55,7 +56,7 @@ if __name__ == '__main__':
     plate_counter = 0
 
     # Loop over every image and perform detection
-    cap = cv2.VideoCapture('/home/jrebernik/Magistrska/LPR-Software/dataset/collected_images/VID20230303173709.mp4')
+    cap = cv2.VideoCapture('/home/jrebernik/Magistrska/LPR-Software/test_video2.avi')
     # cap = cv2.VideoCapture(0)
 
     while cap.isOpened():
@@ -96,31 +97,54 @@ if __name__ == '__main__':
                 # print(roi_area)
 
                 img_roi = cv2.resize(image[ymin:ymax, xmin:xmax], (520,130)) # Crop image to ROI and resize
-                img_roi = cv2.cvtColor(img_roi, cv2.COLOR_BGR2GRAY)
-                cv2.imshow('Gray plate', img_roi)
+                img_roi = cv2.GaussianBlur(img_roi, (7,7), 0)
+                
+                roi_std = np.std(img_roi, axis=2).astype(np.uint8)
+                _, roi_std = cv2.threshold(roi_std, 25, 255, cv2.THRESH_BINARY) # Get the mask of where the emblem and SLO is.
+                cv2.imshow('STD mask', roi_std)
+                kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
+                roi_std = cv2.morphologyEx(roi_std, cv2.MORPH_CLOSE, kernel=kernel)
+                kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
+                roi_std = cv2.morphologyEx(roi_std, cv2.MORPH_DILATE, kernel=kernel)
+                
+                # img_roi = cv2.cvtColor(img_roi, cv2.COLOR_BGR2GRAY)
+                img_roi = np.mean(img_roi, axis=2).astype(np.uint8) # Better to convert this way as all the colors have the same weight.
 
                 laplacian_var = cv2.Laplacian(img_roi, cv2.CV_64F).var()
                 print('laplacian var:', laplacian_var)
 
-                if laplacian_var > 80: # Process only non blurry images
+                img_roi = cv2.bitwise_or(img_roi, roi_std, mask=None) # Mask out the emblem and SLO bits
+
+                cv2.imshow('Gray plate', img_roi)
+
+                if laplacian_var > 10: # Process only non blurry images
                     # img_roi = cv2.equalizeHist(img_roi)
-                    img_roi = cv2.GaussianBlur(img_roi, (5,5), 0)
-                    cv2.imshow('Eq plate', img_roi)
 
                     histogram = cv2.calcHist([img_roi], [0], None, [256], [0,256], accumulate=False)
-                    hist_max = np.argmax(histogram[10:150], 0)[0] + 10 # Najdi peak med pixli ki imajo vrednost med 50 in 100
 
-                    for thr_const in [-5, 5, 15, 25]:
+                    # plt.plot(histogram)
+                    # plt.show()
+                    
+                    hist_max = np.argmax(histogram[80:255], 0)[0] + 80 # Najdi peak med pixli ki imajo vrednost med 80 in 254
+
+                    for thr_const in [-50, -150]:
+                        # FIXME: Add a clip to threshold because it can go negative
+                        print('thr_const',thr_const)
                         _, img_roi = cv2.threshold(img_roi, hist_max+thr_const, 255, cv2.THRESH_BINARY)
                         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-                        img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_ERODE, kernel=kernel)
-                        cv2.imshow('Region of interest', img_roi)
+                        img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_DILATE, kernel=kernel)
 
                         # ocr_t1 = time.time()
-                        ocr_result = pytesseract.image_to_string(img_roi)
+                        # _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(0,0), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
+                        # _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(img_roi.shape[1]-1,0), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
+                        # _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(img_roi.shape[1]-1,img_roi.shape[0]-1), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
+                        # _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(0,img_roi.shape[0]-1), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
                         # ocr_t2 = time.time()
-                        # print('OCR processing time: %f ms' % ((ocr_t2-ocr_t1)*1000.0))
+                        # print('Processing time: %f ms' % ((ocr_t2-ocr_t1)*1000.0))
 
+                        cv2.imshow('Region of interest', img_roi)
+
+                        ocr_result = pytesseract.image_to_string(img_roi)
                         ocr_result = filterTessOutput(ocr_result)
                         
                         if ocr_result != None:
