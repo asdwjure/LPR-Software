@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 # from tensorflow.lite.python.interpreter import Interpreter
 from tflite_runtime.interpreter import Interpreter
-import easyocr
+import time
 import pytesseract
 
 PATH_TO_MODEL='/home/jrebernik/Magistrska/LPR-Software/RPi/detect.tflite'
@@ -55,8 +55,8 @@ if __name__ == '__main__':
     plate_counter = 0
 
     # Loop over every image and perform detection
-    # cap = cv2.VideoCapture('/home/jrebernik/Magistrska/LPR-Software/dataset/collected_images/VID20230303173709.mp4')
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture('/home/jrebernik/Magistrska/LPR-Software/dataset/collected_images/VID20230303173709.mp4')
+    # cap = cv2.VideoCapture(0)
 
     while cap.isOpened():
         # Start timer (for calculating frame rate)
@@ -95,51 +95,59 @@ if __name__ == '__main__':
             if roi_area > MIN_AREA_PLATE:
                 # print(roi_area)
 
-                img_roi = cv2.resize(image[ymin:ymax, xmin:xmax], (780,195)) # Crop image to ROI and resize
+                img_roi = cv2.resize(image[ymin:ymax, xmin:xmax], (520,130)) # Crop image to ROI and resize
                 img_roi = cv2.cvtColor(img_roi, cv2.COLOR_BGR2GRAY)
                 cv2.imshow('Gray plate', img_roi)
-                img_roi = cv2.equalizeHist(img_roi)
-                img_roi = cv2.GaussianBlur(img_roi, (7,7), 0)
-                cv2.imshow('Eq plate', img_roi)
 
-                histogram = cv2.calcHist([img_roi], [0], None, [256], [0,256], accumulate=False)
-                hist_max = np.argmax(histogram[50:100], 0)[0] + 50 # Najdi peak med pixli ki imajo vrednost med 50 in 100
+                laplacian_var = cv2.Laplacian(img_roi, cv2.CV_64F).var()
+                print('laplacian var:', laplacian_var)
 
+                if laplacian_var > 80: # Process only non blurry images
+                    # img_roi = cv2.equalizeHist(img_roi)
+                    img_roi = cv2.GaussianBlur(img_roi, (5,5), 0)
+                    cv2.imshow('Eq plate', img_roi)
 
-                for thr_const in [5, 15, 25]:
-                    _, img_roi = cv2.threshold(img_roi, hist_max-thr_const, 255, cv2.THRESH_BINARY)
-                    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-                    img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_ERODE, kernel=kernel)
-                    cv2.imshow('Region of interest', img_roi)
+                    histogram = cv2.calcHist([img_roi], [0], None, [256], [0,256], accumulate=False)
+                    hist_max = np.argmax(histogram[10:150], 0)[0] + 10 # Najdi peak med pixli ki imajo vrednost med 50 in 100
 
-                    ocr_result = pytesseract.image_to_string(img_roi)
-                    ocr_result = filterTessOutput(ocr_result)
-                    
-                    if ocr_result != None:
-                        print('Threshold:', hist_max-thr_const)
-                        print(plate_counter, ocr_result)
-                        plate_counter += 1
+                    for thr_const in [-5, 5, 15, 25]:
+                        _, img_roi = cv2.threshold(img_roi, hist_max+thr_const, 255, cv2.THRESH_BINARY)
+                        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+                        img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_ERODE, kernel=kernel)
+                        cv2.imshow('Region of interest', img_roi)
 
-                cv2.rectangle(image, (xmin,ymin), (xmax,ymax), (0,255,0), 2)
+                        # ocr_t1 = time.time()
+                        ocr_result = pytesseract.image_to_string(img_roi)
+                        # ocr_t2 = time.time()
+                        # print('OCR processing time: %f ms' % ((ocr_t2-ocr_t1)*1000.0))
 
-                # Draw label
-                object_name = 'plate' # Look up object name from "labels" array using class index
-                label = '%s: %d%%' % (object_name, int(score*100)) # Example: 'person: 72%'
-                labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
-                label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
-                cv2.rectangle(image, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), (255, 255, 255), cv2.FILLED) # Draw white box to put label text in
-                cv2.putText(image, label, (xmin, label_ymin-7), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2) # Draw label text
+                        ocr_result = filterTessOutput(ocr_result)
+                        
+                        if ocr_result != None:
+                            # print('Threshold:', hist_max-thr_const)
+                            print(plate_counter, ocr_result)
+                            plate_counter += 1
+
+            cv2.rectangle(image, (xmin,ymin), (xmax,ymax), (0,255,0), 2)
+
+            # Draw label
+            object_name = 'plate' # Look up object name from "labels" array using class index
+            label = '%s: %d%%' % (object_name, int(score*100)) # Example: 'person: 72%'
+            labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
+            label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
+            cv2.rectangle(image, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), (255, 255, 255), cv2.FILLED) # Draw white box to put label text in
+            cv2.putText(image, label, (xmin, label_ymin-7), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2) # Draw label text
 
         # Draw framerate in corner of frame
         cv2.putText(image,'FPS: {0:.2f}'.format(frame_rate_calc),(30,50),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,0),2,cv2.LINE_AA)
+
+        # All the results have been drawn on the image, now display the image
+        cv2.imshow('Image', image)
 
         # Calculate framerate
         t2 = cv2.getTickCount()
         time1 = (t2-t1)/freq
         frame_rate_calc= 1/time1
-
-        # All the results have been drawn on the image, now display the image
-        cv2.imshow('Image', image)
 
         if cv2.waitKey(10) & 0xFF ==ord('q'):
             cap.release()
