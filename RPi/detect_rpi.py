@@ -56,7 +56,7 @@ if __name__ == '__main__':
     plate_counter = 0
 
     # Loop over every image and perform detection
-    cap = cv2.VideoCapture('/home/jrebernik/Magistrska/LPR-Software/test_video2.avi')
+    cap = cv2.VideoCapture('/home/jrebernik/Magistrska/LPR-Software/test_video.avi')
     # cap = cv2.VideoCapture(0)
 
     while cap.isOpened():
@@ -135,17 +135,18 @@ if __name__ == '__main__':
                         img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_DILATE, kernel=kernel)
 
                         # ocr_t1 = time.time()
-                        # _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(0,0), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
-                        # _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(img_roi.shape[1]-1,0), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
-                        # _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(img_roi.shape[1]-1,img_roi.shape[0]-1), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
-                        # _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(0,img_roi.shape[0]-1), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
+                        _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(0,0), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
+                        _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(img_roi.shape[1]-1,0), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
+                        _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(img_roi.shape[1]-1,img_roi.shape[0]-1), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
+                        _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(0,img_roi.shape[0]-1), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
                         # ocr_t2 = time.time()
                         # print('Processing time: %f ms' % ((ocr_t2-ocr_t1)*1000.0))
 
                         cv2.imshow('Region of interest', img_roi)
 
-                        ocr_result = pytesseract.image_to_string(img_roi)
-                        ocr_result = filterTessOutput(ocr_result)
+                        # ocr_result = pytesseract.image_to_string(img_roi, lang='eng', config='--oem 1 --psm 6', nice=1)
+                        ocr_result = pytesseract.image_to_string(img_roi, config ='-c load_system_dawg=0 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPRSTUVZYQX0123456789* --psm 7 --oem 1', nice=1)
+                        # ocr_result = filterTessOutput(ocr_result)
                         
                         if ocr_result != None:
                             # print('Threshold:', hist_max-thr_const)
