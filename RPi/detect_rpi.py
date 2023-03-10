@@ -58,7 +58,7 @@ def plate2chars(img, debug=False):
         
         # Only grab components of the appropriate width and height
         keepWidth = w > 7 and w < 47 # 12-36 plus 5 pixels of margain
-        keepHeight = h > 40 and h < 67 # 56-62 plus 5 pixels of margain
+        keepHeight = h > 40 and h < 65 # 56-62 plus 5 pixels of margain
         # keepArea = area > 500 and area < 1500
 
         if all((keepWidth, keepHeight)):
@@ -154,28 +154,25 @@ if __name__ == '__main__':
                 img_roi = cv2.resize(img_roi, (410,100), interpolation=cv2.INTER_LINEAR) # Resize
                 cv2.imshow('Gray plate', img_roi)
 
-                gamma, img_roi = gammaCorrection(img_roi, 127) # Correct the gamma
-                img_roi = cv2.GaussianBlur(img_roi, (3,3), 0)
-                cv2.imshow('Gamma corrected plate', img_roi)
-                print('Gamma correction factor = %.2f' % gamma)
-
                 laplacian_var = cv2.Laplacian(img_roi, cv2.CV_64F).var() # Check if image is not blurry
-                # TODO: Preveri koliko vpliva na to ce imamo kosmat histogram zaradi gamma korekcije
-                # print('laplacian var:', laplacian_var)
+                print('laplacian var: %.2f' % laplacian_var)
 
-                if laplacian_var > 10: # Process only non blurry images
-                    # img_roi = cv2.equalizeHist(img_roi)
+                if laplacian_var > 30.0: # Process only non blurry images
+
+                    gamma, img_roi = gammaCorrection(img_roi, 127) # Correct the gamma
+                    # img_roi = cv2.GaussianBlur(img_roi, (3,3), 0)
+                    cv2.imshow('Gamma corrected plate', img_roi)
+                    print('Gamma correction factor = %.2f' % gamma)
 
                     histogram = cv2.calcHist([img_roi], [0], None, [256], [0,256], accumulate=False)
-
-                    if cv2.waitKey(1) & 0xFF ==ord('h'):
+                    if cv2.waitKey(1) & 0xFF ==ord('h'): # Press H to display histogram
                         plt.plot(histogram)
                         plt.show()
                     
-                    _, img_roi = cv2.threshold(img_roi, 60, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+                    img_roi = cv2.adaptiveThreshold(img_roi, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 15, 2)
                     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
                     img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_OPEN, kernel)
-                    # img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_CLOSE, kernel)
+                    img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_CLOSE, kernel)
                     
                     cv2.imshow('Thresholded ROI', img_roi)
 
@@ -183,11 +180,10 @@ if __name__ == '__main__':
                     plate_chars = cv2.bitwise_not(plate_chars)
                     cv2.imshow("Plate characters", plate_chars)
 
-                    ocr_result = pytesseract.image_to_string(plate_chars, config ='-c load_system_dawg=0 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPRSTUVZYQX0123456789 --psm 11 --oem 1', nice=1)
+                    ocr_result = pytesseract.image_to_string(plate_chars, config ='-c load_system_dawg=0 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPRSTUVZYQX0123456789 --psm 6 --oem 1', nice=1)
                     ocr_result = filterTessOutput(ocr_result)
                     
                     if ocr_result != None:
-                        # print('Threshold:', hist_max-thr_const)
                         print(plate_counter, ocr_result)
                         plate_counter += 1
 
