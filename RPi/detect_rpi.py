@@ -86,11 +86,12 @@ def plate2chars(img, debug=False):
         (cX, cY) = centroids[i]
         
         # Only grab components of the appropriate width and height
-        keepWidth = w > 7 and w < 47 # 12-36 plus 5 pixels of margain
-        keepHeight = h > 40 and h < 65 # 56-62 plus 5 pixels of margain
+        keepWidth = w > 7 and w < 48 # 12-36 plus 5 pixels of margain
+        keepHeight = h > 40 and h < 68 # 56-62 plus 5 pixels of margain
+        keepX = x > 40 # Eliminate SLO area
         # keepArea = area > 500 and area < 1500
 
-        if all((keepWidth, keepHeight)):
+        if all((keepWidth, keepHeight, keepX)):
             # construct a mask for the current connected component and then take the bitwise OR with the mask
             componentMask = (labels == i).astype("uint8") * 255
             mask = cv2.bitwise_or(mask, componentMask)
@@ -137,8 +138,8 @@ if __name__ == '__main__':
     plate_counter = 0
 
     # Loop over every image and perform detection
-    # cap = cv2.VideoCapture('/home/jrebernik/Magistrska/LPR-Software/test_video2.avi')
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture('/home/jrebernik/Magistrska/LPR-Software/test_video.avi')
+    # cap = cv2.VideoCapture(0)
 
     while cap.isOpened():
         # Start timer (for calculating frame rate)
@@ -181,18 +182,18 @@ if __name__ == '__main__':
                 img_roi = image[ymin:ymax, xmin:xmax].copy() # Crop image
                 img_roi = np.mean(img_roi, axis=2).astype(np.uint8) # Better to convert to grayscale this way as all the colors have the same weight.
                 img_roi = cv2.GaussianBlur(img_roi, (5,5), 0) # Filter the noise
-                img_roi = cv2.resize(img_roi, (410,100), interpolation=cv2.INTER_LINEAR) # Resize
+                img_roi = cv2.resize(img_roi, (410,100), interpolation=cv2.INTER_LINEAR) # Resize. TODO: Possible tweak: make the ROI image bigger so we have more information. This way we would avoid thresholding issues between two chars.
                 cv2.imshow('Gray plate', img_roi)
 
                 laplacian_var = cv2.Laplacian(img_roi, cv2.CV_64F).var() # Check if image is not blurry
-                print('laplacian var: %.2f' % laplacian_var)
+                # print('laplacian var: %.2f' % laplacian_var)
 
                 if laplacian_var > 30.0: # Process only non blurry images
 
                     gamma, img_roi = gammaCorrection(img_roi, 127) # Correct the gamma
                     # img_roi = cv2.GaussianBlur(img_roi, (3,3), 0)
                     cv2.imshow('Gamma corrected plate', img_roi)
-                    print('Gamma correction factor = %.2f' % gamma)
+                    # print('Gamma correction factor = %.2f' % gamma)
 
                     histogram = cv2.calcHist([img_roi], [0], None, [256], [0,256], accumulate=False)
                     if cv2.waitKey(1) & 0xFF ==ord('h'): # Press H to display histogram
