@@ -25,7 +25,7 @@ def filterTessOutput(ocr_output):
         if c in PLATE_CHARS:
             ocr.append(c)
 
-    if len(ocr) != 8: return None # Plates are of type KPCR-292
+    #  if len(ocr) != 8: return None # Plates are of type KPCR-292
 
     city = ''.join(ocr[0:2]) # first two chars are city
     if city not in PLATE_CITIES:
@@ -39,6 +39,52 @@ def gammaCorrection(img, desired_mean_out):
     img_gamma = np.power(img/255.0, gamma)
     img_gamma = np.uint8(img_gamma*255)
     return gamma, img_gamma
+
+def plate2chars(img, debug=False):
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img)
+
+    # initialize an output mask to store all characters parsed from the license plate
+    mask = np.zeros(img.shape, dtype="uint8")
+
+    # loop over the number of unique connected component labels
+    for i in range(0, num_labels):
+        # extract the connected component statistics and centroid for the current label
+        x = stats[i, cv2.CC_STAT_LEFT]
+        y = stats[i, cv2.CC_STAT_TOP]
+        w = stats[i, cv2.CC_STAT_WIDTH]
+        h = stats[i, cv2.CC_STAT_HEIGHT]
+        area = stats[i, cv2.CC_STAT_AREA]
+        (cX, cY) = centroids[i]
+        
+        # Only grab components of the appropriate width and height
+        keepWidth = w > 7 and w < 47 # 12-36 plus 5 pixels of margain
+        keepHeight = h > 40 and h < 67 # 56-62 plus 5 pixels of margain
+        # keepArea = area > 500 and area < 1500
+
+        if all((keepWidth, keepHeight)):
+            # construct a mask for the current connected component and then take the bitwise OR with the mask
+            componentMask = (labels == i).astype("uint8") * 255
+            mask = cv2.bitwise_or(mask, componentMask)
+        
+        if debug:
+        # clone our original image (so we can draw on it) and then draw
+        # a bounding box surrounding the connected component along with
+        # a circle corresponding to the centroid
+            output = img.copy()
+            cv2.rectangle(output, (x, y), (x + w, y + h), (0, 255, 0), 3)
+            cv2.circle(output, (int(cX), int(cY)), 4, (0, 0, 255), -1)
+
+            print('x,y,w,h:', x,y,w,h)
+            
+            # construct a mask for the current connected component by
+            # finding a pixels in the labels array that have the current
+            # connected component ID
+            componentMask = (labels == i).astype("uint8") * 255
+            
+            cv2.imshow("Connected Component", componentMask)
+            cv2.waitKey(0)
+
+    return mask
 
 if __name__ == '__main__':
 
@@ -63,7 +109,7 @@ if __name__ == '__main__':
     plate_counter = 0
 
     # Loop over every image and perform detection
-    cap = cv2.VideoCapture('/home/jrebernik/Magistrska/LPR-Software/test_video2.avi')
+    cap = cv2.VideoCapture('/home/jrebernik/Magistrska/LPR-Software/test_video.avi')
     # cap = cv2.VideoCapture(0)
 
     while cap.isOpened():
@@ -102,33 +148,20 @@ if __name__ == '__main__':
 
             if roi_area > MIN_AREA_PLATE:
                 # print(roi_area)
-
-                img_roi = cv2.resize(image[ymin:ymax, xmin:xmax].copy(), (520,130)) # Crop image to ROI and resize
-                # img_roi = cv2.GaussianBlur(img_roi, (5,5), 0)
-                
-                # roi_std = np.std(img_roi, axis=2).astype(np.uint8)
-                # _, roi_std = cv2.threshold(roi_std, 25, 255, cv2.THRESH_BINARY) # Get the mask of where the emblem and SLO is.
-                # cv2.imshow('STD mask', roi_std)
-                # kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
-                # roi_std = cv2.morphologyEx(roi_std, cv2.MORPH_CLOSE, kernel=kernel)
-                # kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
-                # roi_std = cv2.morphologyEx(roi_std, cv2.MORPH_DILATE, kernel=kernel)
-                
-                # img_roi = cv2.cvtColor(img_roi, cv2.COLOR_BGR2GRAY)
-                img_roi = np.mean(img_roi, axis=2).astype(np.uint8) # Better to convert this way as all the colors have the same weight.
-
+                img_roi = image[ymin:ymax, xmin:xmax].copy() # Crop image
+                img_roi = np.mean(img_roi, axis=2).astype(np.uint8) # Better to convert to grayscale this way as all the colors have the same weight.
+                img_roi = cv2.GaussianBlur(img_roi, (5,5), 0) # Filter the noise
+                img_roi = cv2.resize(img_roi, (410,100), interpolation=cv2.INTER_LINEAR) # Resize
                 cv2.imshow('Gray plate', img_roi)
-                gamma, img_roi = gammaCorrection(img_roi, 110)
-                img_roi = cv2.GaussianBlur(img_roi, (5,5), 0)
+
+                gamma, img_roi = gammaCorrection(img_roi, 127) # Correct the gamma
+                img_roi = cv2.GaussianBlur(img_roi, (3,3), 0)
+                cv2.imshow('Gamma corrected plate', img_roi)
                 print('Gamma correction factor = %.2f' % gamma)
 
-                laplacian_var = cv2.Laplacian(img_roi, cv2.CV_64F).var()
+                laplacian_var = cv2.Laplacian(img_roi, cv2.CV_64F).var() # Check if image is not blurry
+                # TODO: Preveri koliko vpliva na to ce imamo kosmat histogram zaradi gamma korekcije
                 # print('laplacian var:', laplacian_var)
-
-                # img_roi = cv2.bitwise_or(img_roi, roi_std, mask=None) # Mask out the emblem and SLO bits
-                # img_roi[:,0:70] = 255; img_roi[:,215:260] = 255
-
-                cv2.imshow('Gamma corrected plate', img_roi)
 
                 if laplacian_var > 10: # Process only non blurry images
                     # img_roi = cv2.equalizeHist(img_roi)
@@ -136,43 +169,27 @@ if __name__ == '__main__':
                     histogram = cv2.calcHist([img_roi], [0], None, [256], [0,256], accumulate=False)
 
                     if cv2.waitKey(1) & 0xFF ==ord('h'):
-                        plt.figure(1)
-                        plt.subplot(211)
                         plt.plot(histogram)
-                        plt.xlim((0, 255))
-                        plt.subplot(212)
-                        plt.plot(np.log10(histogram))
-                        plt.xlim((0, 255))
                         plt.show()
                     
-                    hist_max = np.argmax(histogram[80:255], 0)[0] + 80 # Najdi peak med pixli ki imajo vrednost med 80 in 254
-                    # print('Hist max:', hist_max)
+                    _, img_roi = cv2.threshold(img_roi, 60, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+                    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
+                    img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_OPEN, kernel)
+                    # img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_CLOSE, kernel)
+                    
+                    cv2.imshow('Thresholded ROI', img_roi)
 
-                    for thr_const in [-80]:
-                        # FIXME: Add a clip to threshold because it can go negative
-                        print('thr_const',thr_const)
-                        _, img_roi = cv2.threshold(img_roi, hist_max+thr_const, 255, cv2.THRESH_BINARY)
-                        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-                        img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_DILATE, kernel=kernel)
+                    plate_chars = plate2chars(img_roi, False)
+                    plate_chars = cv2.bitwise_not(plate_chars)
+                    cv2.imshow("Plate characters", plate_chars)
 
-                        # ocr_t1 = time.time()
-                        # _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(0,0), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
-                        # _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(img_roi.shape[1]-1,0), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
-                        # _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(img_roi.shape[1]-1,img_roi.shape[0]-1), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
-                        # _, img_roi, _, _ = cv2.floodFill(img_roi, mask=None, seedPoint=(0,img_roi.shape[0]-1), newVal=255, loDiff=1, upDiff=1, flags=(8 | ( 255 << 8 )))
-                        # ocr_t2 = time.time()
-                        # print('Processing time: %f ms' % ((ocr_t2-ocr_t1)*1000.0))
-
-                        cv2.imshow('Region of interest', img_roi)
-
-                        # ocr_result = pytesseract.image_to_string(img_roi, lang='eng', config='--oem 1 --psm 6', nice=1)
-                        ocr_result = pytesseract.image_to_string(img_roi, config ='-c load_system_dawg=0 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPRSTUVZYQX0123456789 --psm 7 --oem 1', nice=1)
-                        # ocr_result = filterTessOutput(ocr_result)
-                        
-                        if ocr_result != None:
-                            # print('Threshold:', hist_max-thr_const)
-                            print(plate_counter, ocr_result)
-                            plate_counter += 1
+                    ocr_result = pytesseract.image_to_string(plate_chars, config ='-c load_system_dawg=0 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPRSTUVZYQX0123456789 --psm 11 --oem 1', nice=1)
+                    ocr_result = filterTessOutput(ocr_result)
+                    
+                    if ocr_result != None:
+                        # print('Threshold:', hist_max-thr_const)
+                        print(plate_counter, ocr_result)
+                        plate_counter += 1
 
             cv2.rectangle(image, (xmin,ymin), (xmax,ymax), (0,255,0), 2)
 
