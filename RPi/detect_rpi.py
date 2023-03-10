@@ -20,6 +20,16 @@ PLATE_CHARS = 'ABCDEFGHIJKLMNOPRSTUVZYXQ1234567890-' # All possible chars in a p
 PLATE_CITIES = ['KP', 'LJ', 'KR', 'GO', 'PO', 'NM', 'MB', 'SG', 'KK', 'MS', 'CE']
 
 def filterTessOutput(ocr_output):
+    """Filter output from PyTesseract.
+    Check if characters in ocr_output are in PLATE_CHARS. Also check if
+    first two characters are a valid city.
+    
+    @param
+        ocr_output: raw output from PyTesseract
+        
+    @return
+        Filtered license plate (string)"""
+
     ocr = []
     for c in ocr_output:
         if c in PLATE_CHARS:
@@ -34,6 +44,16 @@ def filterTessOutput(ocr_output):
     return ''.join(ocr)
 
 def gammaCorrection(img, desired_mean_out):
+    """Gamma correction.
+    Calculate gamma factor based on desired_mean_out value and apply gamma correction.
+    
+    @param:
+        img: Source image.
+        desired_mean_out: Desired mean value of the output image.
+        
+    @return
+        Gamma corrected image."""
+    
     mean = np.mean(img)
     gamma = np.log(desired_mean_out/255)/np.log(mean/255)
     img_gamma = np.power(img/255.0, gamma)
@@ -41,6 +61,15 @@ def gammaCorrection(img, desired_mean_out):
     return gamma, img_gamma
 
 def plate2chars(img, debug=False):
+    """Extract and return a mask where the characters are in a plate.
+    Mask elements need to be of a cerating width and height in order to be considered valid.
+
+    @param
+        img: Binary image of white characters on a black background.
+        debug: Optionally provide debug information.
+        
+    @return
+        Mask of white characters on black background."""
     num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img)
 
     # initialize an output mask to store all characters parsed from the license plate
@@ -87,7 +116,6 @@ def plate2chars(img, debug=False):
     return mask
 
 if __name__ == '__main__':
-
     # Load the Tensorflow Lite model into memory
     interpreter = Interpreter(model_path=PATH_TO_MODEL)
     interpreter.allocate_tensors()
@@ -109,8 +137,8 @@ if __name__ == '__main__':
     plate_counter = 0
 
     # Loop over every image and perform detection
-    cap = cv2.VideoCapture('/home/jrebernik/Magistrska/LPR-Software/test_video.avi')
-    # cap = cv2.VideoCapture(0)
+    # cap = cv2.VideoCapture('/home/jrebernik/Magistrska/LPR-Software/test_video2.avi')
+    cap = cv2.VideoCapture(0)
 
     while cap.isOpened():
         # Start timer (for calculating frame rate)
@@ -118,6 +146,8 @@ if __name__ == '__main__':
 
         # Load image and resize to expected shape [1xHxWx3]
         _, image = cap.read()
+        # noise = np.random.normal(0, 25, image.shape)
+        # image = np.clip(image + noise, 0, 255).astype(np.uint8)
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         imH, imW, _ = image.shape 
         image_resized = cv2.resize(image_rgb, (width, height))
