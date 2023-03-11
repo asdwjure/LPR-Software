@@ -203,6 +203,7 @@ if __name__ == '__main__':
                     img_roi = cv2.adaptiveThreshold(img_roi, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 15, 2)
                     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
                     img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_OPEN, kernel)
+                    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
                     img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_CLOSE, kernel)
                     
                     cv2.imshow('Thresholded ROI', img_roi)
