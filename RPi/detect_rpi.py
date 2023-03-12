@@ -138,7 +138,7 @@ if __name__ == '__main__':
     plate_counter = 0
 
     # Loop over every image and perform detection
-    cap = cv2.VideoCapture('/home/jrebernik/Magistrska/LPR-Software/test_video.avi')
+    cap = cv2.VideoCapture('/home/jrebernik/Magistrska/LPR-Software/dataset/collected_images/test_video.avi')
     # cap = cv2.VideoCapture(0)
 
     while cap.isOpened():
