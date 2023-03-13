@@ -27,10 +27,10 @@ if __name__ == '__main__':
         'plate_cities' : PLATE_CITIES
     }
 
-    q = multiprocessing.Queue(maxsize=3)
+    q = multiprocessing.Queue(maxsize=5)
 
-    lpr = LicensePlateRecognition(stream_queue=q, params=params, debug_level=1)
-    webapp = LPR_Webapp(q)
+    lpr = LicensePlateRecognition(stream_queue=q, params=params, debug_level=0)
+    webapp = LPR_Webapp(lpr_object=lpr, stream_queue=q)
 
 
     # Start license plate image processing in a separate process

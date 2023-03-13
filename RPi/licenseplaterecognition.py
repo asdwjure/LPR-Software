@@ -235,6 +235,7 @@ class LicensePlateRecognition:
                         
                         if ocr_result != None:
                             print("Detected license plate #{}: {}".format(self.plate_counter, ocr_result))
+                            self.web_plate = ocr_result
                             self.plate_counter += 1
 
                 cv2.rectangle(image, (xmin,ymin), (xmax,ymax), (0,255,0), 2)
@@ -249,6 +250,8 @@ class LicensePlateRecognition:
             # Draw framerate in corner of frame
             cv2.putText(image,'FPS: {0:.2f}'.format(self.frame_rate_calc),(30,50),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,0),2,cv2.LINE_AA)
             
+            self.web_img = image # image for webapp
+
             if self.debug_level:
                 # All the results have been drawn on the image, now display the image
                 cv2.imshow('Image', image)
@@ -264,3 +267,7 @@ class LicensePlateRecognition:
             if cv2.waitKey(10) & 0xFF ==ord('q'):
                 self.cap.release()
                 cv2.destroyAllWindows()
+
+    def get_frame(self):
+        """Get video stream and information about detected plate."""
+        return self.web_img

@@ -4,28 +4,32 @@ from queue import Queue
 
 
 class LPR_Webapp:
+    app = Flask(__name__)
 
-    # frame = None
     stream_queue = None
 
-    def __init__(self, stream_queue):
+    def __init__(self, lpr_object, stream_queue):
         LPR_Webapp.stream_queue = stream_queue
+        self.lpr_object = lpr_object
         
     def start(self):
-        app.run(debug=False)
+        LPR_Webapp.app.run(debug=False)
 
     @classmethod
     def put_frame(cls, frame):
-        try:
+        if not cls.stream_queue.full():
             cls.stream_queue.put(frame, block=False)
-        except Exception as e:
-            # print(e)
-            pass
 
     @classmethod
     def generate_frames(cls):
         while True:
-            frame = cls.stream_queue.get()
+            # if not cls.stream_queue.empty():
+            try:
+                frame = cls.stream_queue.get()
+                # frame = self.lpr_object.get_frame()
+            except Exception:
+                pass
+
             ret, buffer = cv2.imencode('.jpg', frame)
             frame = buffer.tobytes()
 
@@ -33,14 +37,10 @@ class LPR_Webapp:
                     b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 
-app = Flask(__name__)
+    @app.route('/')
+    def index():
+        return render_template('index.html')
 
-
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/video')
-def video():
-    return Response(LPR_Webapp.generate_frames(),mimetype='multipart/x-mixed-replace; boundary=frame')
+    @app.route('/video')
+    def video():
+        return Response(LPR_Webapp.generate_frames(),mimetype='multipart/x-mixed-replace; boundary=frame')
