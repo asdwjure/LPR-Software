@@ -5,14 +5,21 @@ from tflite_runtime.interpreter import Interpreter
 import time
 import pytesseract
 from matplotlib import pyplot as plt
+import sys
+sys.path.append('/home/jrebernik/Magistrska/LPR-Software/webapp')
+from webapp import LPR_Webapp
 
 
 class LicensePlateRecognition:
     
-    def __init__(self, path_to_model, capture_source=0, params=None, debug_level=0):
+    def __init__(self, stream_queue, params=None, debug_level=0):
+
+        self.stream_queue = stream_queue
 
         # Construct parameters dictionary
         self.params = {
+            'model_path' : params['model_path'],
+            'capture_source' : params['capture_source'],
             'min_conf_threshold' : params['min_conf_threshold'],
             'min_area_plate' : params['min_area_plate'],
             'min_laplacian_var' : params['min_laplacian_var'],
@@ -22,7 +29,7 @@ class LicensePlateRecognition:
         self.debug_level = debug_level
 
         # Load the Tensorflow Lite model into memory
-        self.interpreter = Interpreter(model_path=path_to_model)
+        self.interpreter = Interpreter(model_path=params['model_path'])
         self.interpreter.allocate_tensors()
 
         # Get model details
@@ -42,10 +49,10 @@ class LicensePlateRecognition:
         self.plate_counter = 0
 
         # Loop over every image and perform detection
-        if capture_source == 0:
+        if params['capture_source'] == 0:
             self.cap = cv2.VideoCapture(0)
         else:
-            self.cap = cv2.VideoCapture(capture_source)
+            self.cap = cv2.VideoCapture(params['capture_source'])
 
     def __filterTessOutput(self, raw_ocr):
         """Filter output from PyTesseract.
@@ -230,28 +237,29 @@ class LicensePlateRecognition:
                             print("Detected license plate #{}: {}".format(self.plate_counter, ocr_result))
                             self.plate_counter += 1
 
-                if self.debug_level:
-                    cv2.rectangle(image, (xmin,ymin), (xmax,ymax), (0,255,0), 2)
+                cv2.rectangle(image, (xmin,ymin), (xmax,ymax), (0,255,0), 2)
+                # Draw label
+                object_name = 'plate' # Look up object name from "labels" array using class index
+                label = '%s: %d%%' % (object_name, int(score*100)) # Example: 'plate: 72%'
+                labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
+                label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
+                cv2.rectangle(image, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), (255, 255, 255), cv2.FILLED) # Draw white box to put label text in
+                cv2.putText(image, label, (xmin, label_ymin-7), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2) # Draw label text
 
-                    # Draw label
-                    object_name = 'plate' # Look up object name from "labels" array using class index
-                    label = '%s: %d%%' % (object_name, int(score*100)) # Example: 'person: 72%'
-                    labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
-                    label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
-                    cv2.rectangle(image, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), (255, 255, 255), cv2.FILLED) # Draw white box to put label text in
-                    cv2.putText(image, label, (xmin, label_ymin-7), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2) # Draw label text
-
+            # Draw framerate in corner of frame
+            cv2.putText(image,'FPS: {0:.2f}'.format(self.frame_rate_calc),(30,50),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,0),2,cv2.LINE_AA)
+            
             if self.debug_level:
-                # Draw framerate in corner of frame
-                cv2.putText(image,'FPS: {0:.2f}'.format(self.frame_rate_calc),(30,50),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,0),2,cv2.LINE_AA)
                 # All the results have been drawn on the image, now display the image
                 cv2.imshow('Image', image)
-                # Calculate framerate
-                t2 = cv2.getTickCount()
-                time1 = (t2-t1)/self.freq
-                self.frame_rate_calc= 1/time1
 
-            # webapp.put_frame(image)
+            # Calculate framerate
+            t2 = cv2.getTickCount()
+            time1 = (t2-t1)/self.freq
+            self.frame_rate_calc= 1/time1
+
+            LPR_Webapp.put_frame(image)
+            # self.stream_queue.put(image, False)
 
             if cv2.waitKey(10) & 0xFF ==ord('q'):
                 self.cap.release()
