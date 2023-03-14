@@ -162,6 +162,8 @@ class LicensePlateRecognition:
     def process_image(self):
         """Needs to be running in a separate process because this is an infinate loop."""
 
+        ocr_result = ''
+
         while True:
             # Start timer (for calculating frame rate)
             t1 = cv2.getTickCount()
@@ -249,8 +251,6 @@ class LicensePlateRecognition:
 
             # Draw framerate in corner of frame
             cv2.putText(image,'FPS: {0:.2f}'.format(self.frame_rate_calc),(30,50),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,0),2,cv2.LINE_AA)
-            
-            self.web_img = image # image for webapp
 
             if self.debug_level:
                 # All the results have been drawn on the image, now display the image
@@ -261,13 +261,8 @@ class LicensePlateRecognition:
             time1 = (t2-t1)/self.freq
             self.frame_rate_calc= 1/time1
 
-            LPR_Webapp.put_frame(image)
-            # self.stream_queue.put(image, False)
+            LPR_Webapp.put_frame([image, ocr_result])
 
             if cv2.waitKey(10) & 0xFF ==ord('q'):
                 self.cap.release()
                 cv2.destroyAllWindows()
-
-    def get_frame(self):
-        """Get video stream and information about detected plate."""
-        return self.web_img

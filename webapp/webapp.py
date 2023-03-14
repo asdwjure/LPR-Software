@@ -1,16 +1,20 @@
-from flask import Flask,render_template,Response
+from flask import Flask, render_template, Response, flash
 import cv2
-from queue import Queue
 
 
 class LPR_Webapp:
     app = Flask(__name__)
+    app.secret_key = '1234'
 
     stream_queue = None
+    plate_queue = None
+    lpr_object = None
+
+    plate = ''
 
     def __init__(self, lpr_object, stream_queue):
         LPR_Webapp.stream_queue = stream_queue
-        self.lpr_object = lpr_object
+        LPR_Webapp.lpr_object = lpr_object
         
     def start(self):
         LPR_Webapp.app.run(debug=False)
@@ -23,10 +27,8 @@ class LPR_Webapp:
     @classmethod
     def generate_frames(cls):
         while True:
-            # if not cls.stream_queue.empty():
             try:
-                frame = cls.stream_queue.get()
-                # frame = self.lpr_object.get_frame()
+                frame, LPR_Webapp.plate = cls.stream_queue.get()
             except Exception:
                 pass
 
@@ -35,12 +37,21 @@ class LPR_Webapp:
 
             yield(b'--frame\r\n'
                     b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            
+    @classmethod
+    def put_plate(cls, plate):
+        pass
 
 
-    @app.route('/')
+
+    @app.route('/', methods=['POST', 'GET'])
     def index():
         return render_template('index.html')
 
     @app.route('/video')
     def video():
         return Response(LPR_Webapp.generate_frames(),mimetype='multipart/x-mixed-replace; boundary=frame')
+    
+    @app.route('/get_plate')
+    def get_plate():
+        return LPR_Webapp.plate
