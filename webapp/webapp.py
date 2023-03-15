@@ -1,4 +1,5 @@
-from flask import Flask, render_template, Response, flash
+from flask import Flask, render_template, Response, flash, request
+from flask_sqlalchemy import SQLAlchemy
 import cv2
 
 
@@ -37,10 +38,6 @@ class LPR_Webapp:
 
             yield(b'--frame\r\n'
                     b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-            
-    @classmethod
-    def put_plate(cls, plate):
-        pass
 
 
 

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Text Entries</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('button.delete').click(function() {
+                var id = $(this).data('id');
+                $.ajax({
+                    url: '/delete/' + id,
+                    method: 'POST',
+                    success: function() {
+                        $('tr[data-id=' + id + ']').remove();
+                    }
+                });
+            });
+        });
+    </script>
+</head>
+<body>
+    <div class="container">
+        <table>
+            <td>
+                <h1>Live video stream</h1>
+                <img src="{{ url_for('video_feed') }}"/>
+            </td>
+            <td>
+                <h1>Plate entries</h1>
+                <form action= "#" method="POST">
+                    <!-- <label for="text">Enter new plate:</label> -->
+                    <input type="text" id="text" name="text" placeholder="Enter new plate" maxlength="12">
+                    <button type="submit">Submit</button>
+                </form>
+                <div class="log_msg">{{ log_msg }}</div>
+                <table class="plate_entries">
+                    <thead>
+                        <tr>
+                            <th class="text-th">Stored plates</th>
+                            <th class="delete-th">Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in entries %}
+                        <tr data-id="{{ entry.id }}">
+                            <td>{{ entry.text }}</td>
+                            <td><button class="delete" data-id="{{ entry.id }}">Delete</button></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </td>
+        </table>
+    </div>
+</body>
+</html>
