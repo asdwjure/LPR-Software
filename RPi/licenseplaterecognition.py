@@ -7,7 +7,7 @@ import pytesseract
 from matplotlib import pyplot as plt
 import sys
 sys.path.append('/home/jrebernik/Magistrska/LPR-Software/webapp')
-import webapp
+from webapp import Webapp
 
 
 class LicensePlateRecognition:
@@ -258,7 +258,7 @@ class LicensePlateRecognition:
             time1 = (t2-t1)/self.freq
             self.frame_rate_calc= 1/time1
 
-            webapp.put_frame(image, stream_queue)
+            Webapp.put_frame(image)
 
             if cv2.waitKey(10) & 0xFF ==ord('q'):
                 self.cap.release()
