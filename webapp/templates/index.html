@@ -1,52 +1,58 @@
 <!DOCTYPE html>
 <html>
-<style>
-    table, th, td {
-        border:1px solid black;
-    }
-    </style>
 <head>
     <meta charset="UTF-8">
-    <title>License Plate Recognition</title>
+    <title>Text Entries</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/index.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('button.delete').click(function() {
+                var id = $(this).data('id');
+                $.ajax({
+                    url: '/delete/' + id,
+                    method: 'POST',
+                    success: function() {
+                        $('tr[data-id=' + id + ']').remove();
+                    }
+                });
+            });
+        });
+    </script>
 </head>
-
 <body>
-
-    <table style="width:75%">
-        <tr>
-            <th>Video stream</th>
-            <th>Last detected plate</th>
-        </tr>
-        <tr>
+    <div class="container">
+        <table>
             <td>
-                <p>Last detected plate: <div id="my-div">{{ plate }}</div></p>
-                <script>
-                    // get a reference to the myDiv element
-                    var myDiv = document.getElementById("my-div");
-            
-                    // update the content of myDiv every second
-                    setInterval(function() {
-                    // make a GET request to /get_plate to get the updated string value
-                    fetch('/get_plate')
-                        .then(response => response.text())
-                        .then(data => myDiv.innerHTML = data);
-                    }, 100);
-                </script>
-
-                <div>
-                    <img src="{{ url_for('video') }}" width="50%"/>
-                </div>
+                <h1>Live video stream</h1>
+                <img src="{{ url_for('video_feed') }}"/>
             </td>
-            <!-- nov stolpec -->
             <td>
-                <form action="#" method="POST">
-                    <p><input type="text" name="plate_input" placeholder="Enter plate" /></p>
-                    <p><input type="submit" name="submit" value="Add plate"/></p>
+                <h1>Plate entries</h1>
+                <form action= "#" method="POST">
+                    <!-- <label for="text">Enter new plate:</label> -->
+                    <input type="text" id="text" name="text" placeholder="Enter new plate" maxlength="12">
+                    <button type="submit">Submit</button>
                 </form>
+                <!-- <div class="log_msg">{{ log_msg }}</div> -->
+                <table class="plate_entries">
+                    <thead>
+                        <tr>
+                            <th class="text-th">Stored plates</th>
+                            <th class="delete-th">Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in entries %}
+                        <tr data-id="{{ entry.id }}">
+                            <td>{{ entry.text }}</td>
+                            <td><button class="delete" data-id="{{ entry.id }}">Delete</button></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </td>
-        </tr>
-        
-    </table>
-        
+        </table>
+    </div>
 </body>
 </html>

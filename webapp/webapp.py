@@ -3,52 +3,70 @@ from flask_sqlalchemy import SQLAlchemy
 import cv2
 
 
-class LPR_Webapp:
-    app = Flask(__name__)
-    app.secret_key = '1234'
 
-    stream_queue = None
-    plate_queue = None
-    lpr_object = None
+app = Flask(__name__)
+app.secret_key = '1234'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///text_entries.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.app_context().push()
 
-    plate = ''
+db = SQLAlchemy(app)
+class TextEntry(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.String(20))
 
-    def __init__(self, lpr_object, stream_queue):
-        LPR_Webapp.stream_queue = stream_queue
-        LPR_Webapp.lpr_object = lpr_object
-        
-    def start(self):
-        LPR_Webapp.app.run(debug=False)
-
-    @classmethod
-    def put_frame(cls, frame):
-        if not cls.stream_queue.full():
-            cls.stream_queue.put(frame, block=False)
-
-    @classmethod
-    def generate_frames(cls):
-        while True:
-            try:
-                frame, LPR_Webapp.plate = cls.stream_queue.get()
-            except Exception:
-                pass
-
-            ret, buffer = cv2.imencode('.jpg', frame)
-            frame = buffer.tobytes()
-
-            yield(b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-
-
-    @app.route('/', methods=['POST', 'GET'])
-    def index():
-        return render_template('index.html')
-
-    @app.route('/video')
-    def video():
-        return Response(LPR_Webapp.generate_frames(),mimetype='multipart/x-mixed-replace; boundary=frame')
+STREAM_QUEUE = None
     
-    @app.route('/get_plate')
-    def get_plate():
-        return LPR_Webapp.plate
+def start(queue):
+    global STREAM_QUEUE
+    STREAM_QUEUE = queue
+
+    db.create_all()
+    app.run(debug=False)
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    log_msg = ''
+
+    if request.method == 'POST':
+        text = request.form['text']
+
+        if len(text) > 0 and len(text) < 13:
+            new_entry = TextEntry(text=text)
+            db.session.add(new_entry)
+            db.session.commit()
+            log_msg = 'Successfully added new plate.'
+        else:
+            log_msg = 'Invalid plate!'
+    
+    entries = TextEntry.query.all()
+    return render_template('index.html', entries=entries, log_msg=log_msg)
+
+@app.route('/delete/<int:id>', methods=['POST'])
+def delete_entry(id):
+    entry = TextEntry.query.filter_by(id=id).first()
+    db.session.delete(entry)
+    db.session.commit()
+    return '', 204
+
+def put_frame(frame, stream_queue):
+    if stream_queue != None:
+        if not stream_queue.full():
+            stream_queue.put(frame, block=False)
+
+def gen_frames():
+    while True:
+        try:
+            frame = STREAM_QUEUE.get()
+        except Exception:
+            pass
+
+        ret, buffer = cv2.imencode('.jpg', frame)
+        frame = buffer.tobytes()
+        yield(b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+

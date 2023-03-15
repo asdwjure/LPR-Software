@@ -10,7 +10,7 @@ db = SQLAlchemy(app)
 
 class TextEntry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    text = db.Column(db.String(500))
+    text = db.Column(db.String(20))
 
 @app.route('/database', methods=['GET', 'POST'])
 def index():

@@ -1,1 +1,1 @@
-__all__ = ["app"]
+from .webapp import *

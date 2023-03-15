@@ -7,14 +7,12 @@ import pytesseract
 from matplotlib import pyplot as plt
 import sys
 sys.path.append('/home/jrebernik/Magistrska/LPR-Software/webapp')
-from webapp import LPR_Webapp
+import webapp
 
 
 class LicensePlateRecognition:
     
-    def __init__(self, stream_queue, params=None, debug_level=0):
-
-        self.stream_queue = stream_queue
+    def __init__(self, params=None, debug_level=0):
 
         # Construct parameters dictionary
         self.params = {
@@ -159,7 +157,7 @@ class LicensePlateRecognition:
 
         return mask
 
-    def process_image(self):
+    def process_image(self, stream_queue):
         """Needs to be running in a separate process because this is an infinate loop."""
 
         ocr_result = ''
@@ -242,8 +240,7 @@ class LicensePlateRecognition:
 
                 cv2.rectangle(image, (xmin,ymin), (xmax,ymax), (0,255,0), 2)
                 # Draw label
-                object_name = 'plate' # Look up object name from "labels" array using class index
-                label = '%s: %d%%' % (object_name, int(score*100)) # Example: 'plate: 72%'
+                label = 'Plate (%d%%): %s' % (int(score*100), ocr_result) # Example: 'Plate (72%): KPCR292'
                 labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
                 label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
                 cv2.rectangle(image, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), (255, 255, 255), cv2.FILLED) # Draw white box to put label text in
@@ -261,7 +258,7 @@ class LicensePlateRecognition:
             time1 = (t2-t1)/self.freq
             self.frame_rate_calc= 1/time1
 
-            LPR_Webapp.put_frame([image, ocr_result])
+            webapp.put_frame(image, stream_queue)
 
             if cv2.waitKey(10) & 0xFF ==ord('q'):
                 self.cap.release()
