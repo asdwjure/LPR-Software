@@ -9,7 +9,7 @@ PLATE_CHARS = 'ABCDEFGHIJKLMNOPRSTUVZYXQ1234567890' # All possible chars in a pl
 PLATE_CITIES = ['KP', 'LJ', 'KR', 'GO', 'PO', 'NM', 'MB', 'SG', 'KK', 'MS', 'CE']
 
 def image_processing(q):
-    lpr.process_image(q)
+    lpr.process_image()
 
 def webapp_process(q):
     Webapp.start()
@@ -19,7 +19,8 @@ if __name__ == '__main__':
     # Create an instance (object) of LicensePlateRecognition class
     params = {
         'model_path' : PATH_TO_MODEL,
-        'capture_source' : '/home/jrebernik/Magistrska/LPR-Software/dataset/collected_images/test_video2.avi',
+        # 'capture_source' : '/home/jrebernik/Magistrska/LPR-Software/dataset/collected_images/test_video.avi',
+        'capture_source' : 0,
         'min_conf_threshold' : 0.8,
         'min_area_plate' : 0.05,
         'min_laplacian_var' : 25,

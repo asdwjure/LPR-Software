@@ -77,3 +77,8 @@ class Webapp:
             if not Webapp.stream_queue.full():
                 Webapp.stream_queue.put(frame, block=False)
 
+    @classmethod
+    def get_platesInDatabase(cls):
+        entries = TextEntry.query.all()
+        return [entry.text for entry in entries]
+

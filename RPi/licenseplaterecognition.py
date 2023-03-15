@@ -52,6 +52,10 @@ class LicensePlateRecognition:
         else:
             self.cap = cv2.VideoCapture(params['capture_source'])
 
+        # Timer for getting plates form database every 5 seconds
+        self.platesTimer = 0
+        self.plates = [] # All the plates in webapp database
+
     def __filterTessOutput(self, raw_ocr):
         """Filter output from PyTesseract.
         Check if characters in ocr_output are in PLATE_CHARS. Also check if
@@ -156,8 +160,20 @@ class LicensePlateRecognition:
             cv2.imshow("Plate characters mask", mask)
 
         return mask
+    
+    def __is_PlateInDatabase(self, plate):
+        """Check if the plate is in Webapp database."""
+        if (time.time() - self.platesTimer) > 5.0: # Check every five seconds
+            self.platesTimer = time.time()
+            self.plates = Webapp.get_platesInDatabase()
+            if self.debug_level >= 2: print('Plates saved in database:', self.plates)
 
-    def process_image(self, stream_queue):
+        if plate in self.plates:
+            return True
+        
+        return False
+
+    def process_image(self):
         """Needs to be running in a separate process because this is an infinate loop."""
 
         ocr_result = ''
@@ -186,6 +202,8 @@ class LicensePlateRecognition:
             # Retrieve detection results (detections are sorted, this is why we only take the first one)
             box = self.interpreter.get_tensor(self.output_details[1]['index'])[0][0] # Bounding box coordinates of detected objects
             score = self.interpreter.get_tensor(self.output_details[0]['index'])[0][0] # Confidence of detected objects
+
+            rectangleColor = (0,0,255) # Draw different color rectangle, depending if plate is in database or not
 
             # If detection box confidence is above minimum threshold
             if score > self.params['min_conf_threshold']: # Scores are already sorted
@@ -232,13 +250,18 @@ class LicensePlateRecognition:
 
                         ocr_result = pytesseract.image_to_string(plate_chars, config ='-c load_system_dawg=0 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPRSTUVZYQX0123456789 --psm 6 --oem 1', nice=1)
                         ocr_result = self.__filterTessOutput(ocr_result)
-                        
+
                         if ocr_result != None:
-                            print("Detected license plate #{}: {}".format(self.plate_counter, ocr_result))
-                            self.web_plate = ocr_result
+                            isPlateInDatabase = self.__is_PlateInDatabase(ocr_result)
+                            if isPlateInDatabase:
+                                print("Detected license plate #{}: '{}'. Plate is in database.".format(self.plate_counter, ocr_result))
+                                rectangleColor = (0,255,0)
+                            else:
+                                print("Detected license plate #{}: '{}'. Plate not in database".format(self.plate_counter, ocr_result))
+                                rectangleColor = (0,0,255)
                             self.plate_counter += 1
 
-                cv2.rectangle(image, (xmin,ymin), (xmax,ymax), (0,255,0), 2)
+                cv2.rectangle(image, (xmin,ymin), (xmax,ymax), rectangleColor, 2)
                 # Draw label
                 label = 'Plate (%d%%): %s' % (int(score*100), ocr_result) # Example: 'Plate (72%): KPCR292'
                 labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
@@ -252,6 +275,8 @@ class LicensePlateRecognition:
             if self.debug_level:
                 # All the results have been drawn on the image, now display the image
                 cv2.imshow('Image', image)
+
+            ocr_result = None # Reset ocr result
 
             # Calculate framerate
             t2 = cv2.getTickCount()
