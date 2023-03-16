@@ -1,3 +1,12 @@
+###################################################################################################
+# Title: Web application for license plate recognition software
+# Description: Starts the Flask web server on http://localhost:5000/ where the live feed and
+# plates entries are displayed. Also uses a SQL database from Falsk to store entered plates.
+# Date: 16.3.2023
+# 
+# Jure Rebernik magistrska naloga
+###################################################################################################
+
 from flask import Flask, render_template, Response, flash, request
 from flask_sqlalchemy import SQLAlchemy
 import cv2

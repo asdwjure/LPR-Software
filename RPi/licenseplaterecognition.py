@@ -1,3 +1,11 @@
+###################################################################################################
+# Title: License plate recognition
+# Description: Contains all code to do license plate recognition
+# Date: 16.3.2023
+# 
+# Jure Rebernik magistrska naloga
+###################################################################################################
+
 import cv2
 import numpy as np
 # from tensorflow.lite.python.interpreter import Interpreter

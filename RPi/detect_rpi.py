@@ -1,3 +1,11 @@
+###################################################################################################
+# Title: Main python file for license plate recognition and webapp server
+# Description: Run this file to start the license plate recognition and webapp server.
+# Date: 16.3.2023
+# 
+# Jure Rebernik magistrska naloga
+###################################################################################################
+
 from licenseplaterecognition import LicensePlateRecognition
 import multiprocessing
 import sys
