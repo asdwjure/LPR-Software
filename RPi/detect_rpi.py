@@ -8,10 +8,10 @@ PATH_TO_MODEL='/home/jrebernik/Magistrska/LPR-Software/RPi/detect.tflite'
 PLATE_CHARS = 'ABCDEFGHIJKLMNOPRSTUVZYXQ1234567890' # All possible chars in a plate
 PLATE_CITIES = ['KP', 'LJ', 'KR', 'GO', 'PO', 'NM', 'MB', 'SG', 'KK', 'MS', 'CE']
 
-def image_processing(q):
+def image_processing():
     lpr.process_image()
 
-def webapp_process(q):
+def webapp_process():
     Webapp.start()
 
 if __name__ == '__main__':
@@ -34,8 +34,8 @@ if __name__ == '__main__':
     web = Webapp(q) # Init webapp object
 
     # Start license plate image processing in a separate process
-    p1 = multiprocessing.Process(target = image_processing, args=(q,))
-    p2 = multiprocessing.Process(target = webapp_process, args=(q,))
+    p1 = multiprocessing.Process(target = image_processing, args=())
+    p2 = multiprocessing.Process(target = webapp_process, args=())
     p1.start()
     p2.start()
     p1.join()
