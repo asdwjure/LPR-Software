@@ -236,10 +236,11 @@ class LicensePlateRecognition:
                         _, img_roi = self.__gammaCorrection(img_roi, 127) # Correct the gamma
                         # img_roi = cv2.GaussianBlur(img_roi, (3,3), 0) # TODO: Play around with this if it is neeed. I would assume that it is.
 
-                        histogram = cv2.calcHist([img_roi], [0], None, [256], [0,256], accumulate=False)
-                        if cv2.waitKey(1) & 0xFF ==ord('h'): # Press H to display histogram
-                            plt.plot(histogram)
-                            plt.show()
+                        if self.debug_level:
+                            histogram = cv2.calcHist([img_roi], [0], None, [256], [0,256], accumulate=False)
+                            if cv2.waitKey(1) & 0xFF ==ord('h'): # Press H to display histogram
+                                plt.plot(histogram)
+                                plt.show()
                         
                         img_roi = cv2.adaptiveThreshold(img_roi, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 15, 2)
                         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
