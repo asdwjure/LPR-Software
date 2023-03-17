@@ -90,4 +90,3 @@ class Webapp:
     def get_platesInDatabase(cls):
         entries = TextEntry.query.all()
         return [entry.text for entry in entries]
-

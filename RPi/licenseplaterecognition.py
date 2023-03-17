@@ -8,15 +8,11 @@
 
 import cv2
 import numpy as np
-# from tensorflow.lite.python.interpreter import Interpreter
 from tflite_runtime.interpreter import Interpreter
 import time
 import pytesseract
 from matplotlib import pyplot as plt
-import sys
-sys.path.append('/home/jrebernik/Magistrska/LPR-Software/webapp')
 from webapp import Webapp
-
 
 class LicensePlateRecognition:
     
@@ -159,7 +155,6 @@ class LicensePlateRecognition:
 
                     if self.debug_level >= 3:
                         print('Mask component {}: (x,y,w,h) = {}'.format(i, (x,y,w,h)))
-
 
         mask = cv2.bitwise_not(mask) # We need black characters on white surface
 

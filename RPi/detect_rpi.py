@@ -6,13 +6,15 @@
 # Jure Rebernik magistrska naloga
 ###################################################################################################
 
+import sys
+import os
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
 from licenseplaterecognition import LicensePlateRecognition
 import multiprocessing
-import sys
-sys.path.append('/home/jrebernik/Magistrska/LPR-Software/webapp')
 from webapp import Webapp
 
-PATH_TO_MODEL='/home/jrebernik/Magistrska/LPR-Software/RPi/detect.tflite'
+PATH_TO_MODEL=os.path.join(BASE_DIR, 'RPi/detect.tflite')
 PLATE_CHARS = 'ABCDEFGHIJKLMNOPRSTUVZYXQ1234567890' # All possible chars in a plate
 PLATE_CITIES = ['KP', 'LJ', 'KR', 'GO', 'PO', 'NM', 'MB', 'SG', 'KK', 'MS', 'CE']
 
@@ -47,5 +49,4 @@ if __name__ == '__main__':
     p1.start()
     p2.start()
     p1.join()
-
     
