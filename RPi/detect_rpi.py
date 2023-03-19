@@ -8,8 +8,15 @@
 
 import sys
 import os
+
+# EasyOCR is not thread safe. It uses OpenCV in multithreading mode. So we limit
+# num of threads for OpenCV to 1. Negligable performance drop.
+os.environ['OMP_NUM_THREADS'] = '1'
+
+# Set project base directory
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
+
 from licenseplaterecognition import LicensePlateRecognition
 import multiprocessing
 from webapp import Webapp

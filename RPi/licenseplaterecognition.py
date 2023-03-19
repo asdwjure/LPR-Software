@@ -292,22 +292,21 @@ class LicensePlateRecognition:
                         # cv2.imshow('small roi for ocr', plate_chars)
 
                         ocr_result = self.ocr_reader.recognize(plate_chars, [text_box], [], paragraph=False, batch_size=1, allowlist=self.params['plate_chars'])
-                        # ocr_result = self.__filterOcrOutput(ocr_result)
-                        print(ocr_result)
+                        ocr_result = self.__filterOcrOutput(ocr_result)
 
-                        # if ocr_result != None:
-                        #     isPlateInDatabase = self.__is_PlateInDatabase(ocr_result)
-                        #     if isPlateInDatabase:
-                        #         print("Detected license plate #{}: '{}'. Plate is in database.".format(self.plate_counter, ocr_result))
-                        #         rectangleColor = (0,255,0)
-                        #     else:
-                        #         print("Detected license plate #{}: '{}'. Plate not in database".format(self.plate_counter, ocr_result))
-                        #         rectangleColor = (0,0,255)
-                        #     self.plate_counter += 1
+                        if ocr_result != None:
+                            isPlateInDatabase = self.__is_PlateInDatabase(ocr_result)
+                            if isPlateInDatabase:
+                                print("Detected license plate #{}: '{}'. Plate is in database.".format(self.plate_counter, ocr_result))
+                                rectangleColor = (0,255,0)
+                            else:
+                                print("Detected license plate #{}: '{}'. Plate not in database".format(self.plate_counter, ocr_result))
+                                rectangleColor = (0,0,255)
+                            self.plate_counter += 1
 
                 cv2.rectangle(image, (xmin,ymin), (xmax,ymax), rectangleColor, 2)
                 # Draw label
-                label = 'Plate (%d%%): %s' % (int(score*100), "AAAA") # Example: 'Plate (72%): KPCR292'
+                label = 'Plate (%d%%): %s' % (int(score*100), ocr_result) # Example: 'Plate (72%): KPCR292'
                 labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
                 label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
                 cv2.rectangle(image, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), (255, 255, 255), cv2.FILLED) # Draw white box to put label text in
@@ -320,7 +319,7 @@ class LicensePlateRecognition:
                 # All the results have been drawn on the image, now display the image
                 cv2.imshow('Image', image)
 
-            # ocr_result = None # Reset ocr result
+            ocr_result = None # Reset ocr result
 
             # Calculate framerate
             t2 = cv2.getTickCount()

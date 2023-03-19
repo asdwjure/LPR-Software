@@ -179,10 +179,10 @@ if __name__ == '__main__':
                 print(detected_plate)
                 plates.append(detected_plate)
                 
-                for box in ocr_result:
-                    start_point = box[0][0]
-                    end_point = box[0][2]
-                    cv2.rectangle(img_roi, start_point.astype(np.int64), end_point.astype(np.int64), (255,255,255), 2)
+                # for box in ocr_result:
+                #     start_point = box[0][0]
+                #     end_point = box[0][2]
+                #     cv2.rectangle(img_roi, start_point.astype(np.int64), end_point.astype(np.int64), (255,255,255), 2)
 
                 cv2.imshow('Region of interest', img_roi)
 

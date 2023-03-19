@@ -140,28 +140,7 @@ if __name__ == '__main__':
 
                 # print(roi) # Print Region Of Interest
 
-                img_roi = cv2.resize(img_np[roi[0]:roi[2], roi[1]:roi[3]], (780,195)) # Crop image to ROI and resize
-                img_roi = cv2.cvtColor(img_roi, cv2.COLOR_BGR2GRAY)
-                img_roi = cv2.GaussianBlur(img_roi, (9,9), 0)
-                cv2.imshow('Gray plate', img_roi)
-                # img_roi = cv2.bitwise_not(img_roi) # Invert image
-                # cv2.imshow('Inverted plate', img_roi)
-                # img_roi = cv2.equalizeHist(img_roi)
-                # cv2.imshow('Eq plate', img_roi)
-                mean_value = np.mean(img_roi[80:120, 200:580])
-                min_value = np.min(img_roi[80:120, 200:580])
-                max_value = np.max(img_roi[80:120, 200:580])
-                cv2.imshow('Mean value calculation', img_roi[80:120, 200:580])
-                print('Mean, min, max:', mean_value, min_value, max_value)
-                thresh = mean_value - (1.0*(255-min_value)/255 + 1)*35
-                print('Thresholold:', thresh)
-                _, img_roi = cv2.threshold(img_roi, thresh, 255, cv2.THRESH_BINARY_INV)
-                # img_roi = cv2.adaptiveThreshold(img_roi, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 41, 35)
-                cv2.imshow('Thresholding', img_roi)
-                kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-                # img_roi = cv2.erode(img_roi, kernel=kernel)
-                # img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_CLOSE, kernel=kernel) # 2 times because no. of iterations is not equal to two calls to this function.
-                # img_roi = cv2.morphologyEx(img_roi, cv2.MORPH_CLOSE, kernel=kernel)
+                img_roi = cv2.resize(img_np[roi[0]:roi[2], roi[1]:roi[3]], (205,50)) # Crop image to ROI and resize
 
                 ocr_result = reader.readtext(img_roi, allowlist=PLATE_CHARS, min_size=60, height_ths=0.1, width_ths=0.1) # Perform OCR
                 # ocr_result = pytesseract.image_to_string(img_roi, config='--psm 11')
