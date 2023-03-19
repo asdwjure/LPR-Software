@@ -29,8 +29,8 @@ if __name__ == '__main__':
     # Create an instance (object) of LicensePlateRecognition class
     params = {
         'model_path' : PATH_TO_MODEL,
-        # 'capture_source' : '/home/jrebernik/Magistrska/LPR-Software/dataset/collected_images/test_video.avi',
-        'capture_source' : 0,
+        'capture_source' : '/home/jrebernik/Magistrska/LPR-Software/dataset/collected_images/test_video.avi',
+        # 'capture_source' : 0,
         'min_conf_threshold' : 0.8,
         'min_area_plate' : 0.05,
         'min_laplacian_var' : 25,
@@ -40,7 +40,7 @@ if __name__ == '__main__':
 
     q = multiprocessing.Queue(maxsize=5)
 
-    lpr = LicensePlateRecognition(params=params, debug_level=0)
+    lpr = LicensePlateRecognition(params=params, debug_level=1)
     web = Webapp(q) # Init webapp object
 
     # Start license plate image processing in a separate process

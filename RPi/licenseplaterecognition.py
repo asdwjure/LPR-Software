@@ -6,6 +6,10 @@
 # Jure Rebernik magistrska naloga
 ###################################################################################################
 
+import sys
+import os
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
 import cv2
 import numpy as np
 from tflite_runtime.interpreter import Interpreter
@@ -13,6 +17,7 @@ import time
 import pytesseract
 from matplotlib import pyplot as plt
 from webapp import Webapp
+import easyocr
 
 class LicensePlateRecognition:
     
@@ -29,6 +34,8 @@ class LicensePlateRecognition:
             'plate_cities' : params['plate_cities']
         }
         self.debug_level = debug_level
+
+        self.ocr_reader = easyocr.Reader(lang_list=['en'], gpu=False)
 
         # Load the Tensorflow Lite model into memory
         self.interpreter = Interpreter(model_path=params['model_path'])
@@ -60,8 +67,8 @@ class LicensePlateRecognition:
         self.platesTimer = 0
         self.plates = [] # All the plates in webapp database
 
-    def __filterTessOutput(self, raw_ocr):
-        """Filter output from PyTesseract.
+    def __filterOcrOutput(self, raw_ocr):
+        """Filter output from EasyOCR.
         Check if characters in ocr_output are in PLATE_CHARS. Also check if
         first two characters are a valid city.
         
@@ -74,16 +81,19 @@ class LicensePlateRecognition:
         if self.debug_level >= 2:
             print("Raw OCR output: '%s'" % raw_ocr) # Print raw OCR output as debug information
 
-        filtered_ocr = []
-        for c in raw_ocr:
-            if c in self.params['plate_chars']:
-                filtered_ocr.append(c)
+        score = raw_ocr[0][2]
 
-        city = ''.join(filtered_ocr[0:2]) # first two chars are city
-        if city not in self.params['plate_cities']:
-            return None
+        if score > 0.5:
+            filtered_ocr = []
+            for c in raw_ocr[0][1]:
+                if c in self.params['plate_chars']:
+                    filtered_ocr.append(c)
 
-        return ''.join(filtered_ocr)
+            city = ''.join(filtered_ocr[0:2]) # first two chars are city
+            if city not in self.params['plate_cities']:
+                return None
+
+            return ''.join(filtered_ocr)
 
     def __gammaCorrection(self, img, desired_mean_out):
         """Gamma correction.
@@ -125,6 +135,12 @@ class LicensePlateRecognition:
         output = img.copy() # For debugging
         output = cv2.cvtColor(output, cv2.COLOR_GRAY2BGR)
 
+        text_box = []
+        xmin = img.shape[1]
+        xmax = 0
+        ymin = img.shape[0]
+        ymax = 0
+
         # loop over the number of unique connected component labels
         for i in range(0, num_labels):
             # extract the connected component statistics and centroid for the current label
@@ -141,10 +157,16 @@ class LicensePlateRecognition:
             keepX = x > 40 # Eliminate SLO area
             # keepArea = area > 500 and area < 1500
 
-            if all((keepWidth, keepHeight, keepX)):
+            if all((keepWidth, keepHeight, keepX)): # Valid character detected
                 # construct a mask for the current connected component and then take the bitwise OR with the mask
                 componentMask = (labels == i).astype("uint8") * 255
                 mask = cv2.bitwise_or(mask, componentMask)
+
+                # Find outmost elements so that we can create a text box around all characters
+                xmin = min([xmin, x])
+                xmax = max([xmax, x+w])
+                ymin = min([ymin, y])
+                ymax = max([ymax, y+h])
             
                 if self.debug_level:
                 # clone our original image (so we can draw on it) and then draw
@@ -156,13 +178,26 @@ class LicensePlateRecognition:
                     if self.debug_level >= 3:
                         print('Mask component {}: (x,y,w,h) = {}'.format(i, (x,y,w,h)))
 
-        mask = cv2.bitwise_not(mask) # We need black characters on white surface
+        # Expand text box for 5 pixels
+        xmin = max([0, xmin-5])
+        xmax = min([img.shape[1], xmax+5])
+        ymin = max([0, ymin-5])
+        ymax = min([img.shape[0], ymax+5])
+        text_box = [xmin,xmax,ymin,ymax]
+
+        # TODO: Add image deskewing. Calculate angle with arctg.
+
+        if self.debug_level >= 2:
+            print('Text box around all components:', text_box)
+
+        # mask = cv2.bitwise_not(mask) # We need black characters on white surface
 
         if self.debug_level:
+            cv2.rectangle(output, (xmin,ymin), (xmax,ymax), (255,100,0), 2)
             cv2.imshow("Boxes of connected components", output)
             cv2.imshow("Plate characters mask", mask)
 
-        return mask
+        return mask, text_box
     
     def __is_PlateInDatabase(self, plate):
         """Check if the plate is in Webapp database."""
@@ -250,24 +285,29 @@ class LicensePlateRecognition:
                         
                         if self.debug_level: cv2.imshow('Thresholded ROI', img_roi)
 
-                        plate_chars = self.__plate2chars(img_roi)
+                        plate_chars, text_box = self.__plate2chars(img_roi)
+                        
+                        # plate_chars = cv2.resize(plate_chars, (137,33), interpolation=cv2.INTER_LINEAR)
+                        # text_box = [int(i/3) for i in text_box]
+                        # cv2.imshow('small roi for ocr', plate_chars)
 
-                        ocr_result = pytesseract.image_to_string(plate_chars, config ='-c load_system_dawg=0 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPRSTUVZYQX0123456789 --psm 6 --oem 1', nice=1)
-                        ocr_result = self.__filterTessOutput(ocr_result)
+                        ocr_result = self.ocr_reader.recognize(plate_chars, [text_box], [], paragraph=False, batch_size=1, allowlist=self.params['plate_chars'])
+                        # ocr_result = self.__filterOcrOutput(ocr_result)
+                        print(ocr_result)
 
-                        if ocr_result != None:
-                            isPlateInDatabase = self.__is_PlateInDatabase(ocr_result)
-                            if isPlateInDatabase:
-                                print("Detected license plate #{}: '{}'. Plate is in database.".format(self.plate_counter, ocr_result))
-                                rectangleColor = (0,255,0)
-                            else:
-                                print("Detected license plate #{}: '{}'. Plate not in database".format(self.plate_counter, ocr_result))
-                                rectangleColor = (0,0,255)
-                            self.plate_counter += 1
+                        # if ocr_result != None:
+                        #     isPlateInDatabase = self.__is_PlateInDatabase(ocr_result)
+                        #     if isPlateInDatabase:
+                        #         print("Detected license plate #{}: '{}'. Plate is in database.".format(self.plate_counter, ocr_result))
+                        #         rectangleColor = (0,255,0)
+                        #     else:
+                        #         print("Detected license plate #{}: '{}'. Plate not in database".format(self.plate_counter, ocr_result))
+                        #         rectangleColor = (0,0,255)
+                        #     self.plate_counter += 1
 
                 cv2.rectangle(image, (xmin,ymin), (xmax,ymax), rectangleColor, 2)
                 # Draw label
-                label = 'Plate (%d%%): %s' % (int(score*100), ocr_result) # Example: 'Plate (72%): KPCR292'
+                label = 'Plate (%d%%): %s' % (int(score*100), "AAAA") # Example: 'Plate (72%): KPCR292'
                 labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
                 label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
                 cv2.rectangle(image, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), (255, 255, 255), cv2.FILLED) # Draw white box to put label text in
@@ -280,7 +320,7 @@ class LicensePlateRecognition:
                 # All the results have been drawn on the image, now display the image
                 cv2.imshow('Image', image)
 
-            ocr_result = None # Reset ocr result
+            # ocr_result = None # Reset ocr result
 
             # Calculate framerate
             t2 = cv2.getTickCount()
@@ -292,3 +332,24 @@ class LicensePlateRecognition:
             if cv2.waitKey(10) & 0xFF ==ord('q'):
                 self.cap.release()
                 cv2.destroyAllWindows()
+
+if __name__ == '__main__':
+
+    PATH_TO_MODEL=os.path.join(BASE_DIR, 'RPi/detect.tflite')
+    PLATE_CHARS = 'ABCDEFGHIJKLMNOPRSTUVZYXQ1234567890' # All possible chars in a plate
+    PLATE_CITIES = ['KP', 'LJ', 'KR', 'GO', 'PO', 'NM', 'MB', 'SG', 'KK', 'MS', 'CE']
+
+    params = {
+        'model_path' : PATH_TO_MODEL,
+        'capture_source' : '/home/jrebernik/Magistrska/LPR-Software/dataset/collected_images/test_video.avi',
+        # 'capture_source' : 0,
+        'min_conf_threshold' : 0.8,
+        'min_area_plate' : 0.05,
+        'min_laplacian_var' : 25,
+        'plate_chars': 'ABCDEFGHIJKLMNOPRSTUVZYXQ1234567890',
+        'plate_cities' : PLATE_CITIES
+    }
+
+    lpr = LicensePlateRecognition(params=params, debug_level=1)
+
+    lpr.process_image()
