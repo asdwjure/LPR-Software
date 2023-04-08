@@ -340,7 +340,7 @@ if __name__ == '__main__':
 
     params = {
         'model_path' : PATH_TO_MODEL,
-        'capture_source' : '/home/jrebernik/Magistrska/LPR-Software/dataset/collected_images/test_video.avi',
+        'capture_source' : '/home/jrebernik/Magistrska/LPR-Software/dataset/collected_images/test_video2.avi',
         # 'capture_source' : 0,
         'min_conf_threshold' : 0.8,
         'min_area_plate' : 0.05,
